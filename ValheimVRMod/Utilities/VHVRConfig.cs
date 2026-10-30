@@ -156,6 +156,7 @@ namespace ValheimVRMod.Utilities
         private static ConfigEntry<float> magicPassiveFeedInterval;
         private static ConfigEntry<float> magicMoteEitrBonus;
         private static ConfigEntry<float> magicMoteCollisionRadius;
+        private static ConfigEntry<int> magicMotesPerStage;
         private static ConfigEntry<float> magicFizzleLockout;
         private static ConfigEntry<float> magicChargeExpiryDuration;
         private static ConfigEntry<string> groqApiKey;
@@ -988,6 +989,12 @@ namespace ValheimVRMod.Utilities
                                                    new ConfigDescription(
                                                        "Contact radius in meters for the off-hand to catch an active mote.",
                                                        new AcceptableValueRange<float>(0.03f, 0.20f)));
+            magicMotesPerStage = config.Bind("Controls",
+                                             "MagicMotesPerStage",
+                                             3,
+                                             new ConfigDescription(
+                                                 "Number of elemental motes spawned simultaneously per wave during active gesture casting. Once all active motes are absorbed, the next wave spawns.",
+                                                 new AcceptableValueRange<int>(1, 10)));
             magicFizzleLockout = config.Bind("Controls",
                                              "MagicFizzleLockout",
                                              1.0f,
@@ -2130,6 +2137,11 @@ namespace ValheimVRMod.Utilities
         public static float MagicMoteCollisionRadius()
         {
             return magicMoteCollisionRadius.Value;
+        }
+
+        public static int MagicMotesPerStage()
+        {
+            return magicMotesPerStage.Value;
         }
 
         public static float MagicFizzleLockout()

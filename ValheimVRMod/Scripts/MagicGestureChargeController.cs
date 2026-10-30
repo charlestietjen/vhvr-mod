@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using ValheimVRMod.VRCore;
@@ -56,15 +57,22 @@ namespace ValheimVRMod.Scripts
         private AudioClip cachedDissipateClip;
         private bool attemptedClipLoad = false;
 
-        // Active casting mote indicator
-        private GameObject moteObject;
-        private MeshRenderer moteRenderer;
-        private Material moteMaterial;
-        private GameObject moteAuraObject;
-        private MeshRenderer moteAuraRenderer;
-        private Material moteAuraMaterial;
-        private Vector3 activeMoteLocalPos;
-        private bool isMoteActive = false;
+        // Active casting mote indicators
+        private class MoteInstance
+        {
+            public GameObject gameObject;
+            public MeshRenderer meshRenderer;
+            public Material material;
+            public GameObject auraObject;
+            public MeshRenderer auraRenderer;
+            public Material auraMaterial;
+            public Vector3 localOffset;
+            public bool isActive;
+        }
+
+        private const int MAX_POOLED_MOTES = 10;
+        private readonly List<MoteInstance> motePool = new List<MoteInstance>();
+        private int activeMotesRemaining = 0;
 
         private static Texture2D s_softParticleTexture;
         private static Texture2D s_rimGlowTexture;
@@ -290,39 +298,54 @@ namespace ValheimVRMod.Scripts
             pointLight.intensity = 1.0f;
             pointLight.shadows = LightShadows.None;
 
-            // Active casting mote (small incandescent sphere + rim glow aura)
-            moteObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(moteObject.GetComponent<Collider>());
-            moteObject.name = "VHVR_MagicMote";
-            moteObject.transform.SetParent(indicatorObject.transform, false);
-            moteObject.transform.localScale = Vector3.one * 0.038f;
-            moteObject.layer = LayerUtils.getWorldspaceUiLayer();
+            // Active casting motes pool (small incandescent sphere + rim glow aura)
+            for (int i = 0; i < MAX_POOLED_MOTES; i++)
+            {
+                GameObject moteObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(moteObj.GetComponent<Collider>());
+                moteObj.name = "VHVR_MagicMote_" + i;
+                moteObj.transform.SetParent(indicatorObject.transform, false);
+                moteObj.transform.localScale = Vector3.one * 0.038f;
+                moteObj.layer = LayerUtils.getWorldspaceUiLayer();
 
-            moteRenderer = moteObject.GetComponent<MeshRenderer>();
-            moteMaterial = unlitMatAsset != null ? Instantiate(unlitMatAsset) : new Material(Shader.Find("Unlit/Transparent") ?? Shader.Find("Unlit/Color"));
-            moteRenderer.material = moteMaterial;
-            moteRenderer.receiveShadows = false;
-            moteRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            moteRenderer.lightProbeUsage = LightProbeUsage.Off;
-            moteRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+                var mRenderer = moteObj.GetComponent<MeshRenderer>();
+                var mMat = unlitMatAsset != null ? Instantiate(unlitMatAsset) : new Material(Shader.Find("Unlit/Transparent") ?? Shader.Find("Unlit/Color"));
+                mRenderer.material = mMat;
+                mRenderer.receiveShadows = false;
+                mRenderer.shadowCastingMode = ShadowCastingMode.Off;
+                mRenderer.lightProbeUsage = LightProbeUsage.Off;
+                mRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
 
-            moteAuraObject = new GameObject("VHVR_MagicMoteAura");
-            moteAuraObject.transform.SetParent(moteObject.transform, false);
-            moteAuraObject.layer = LayerUtils.getWorldspaceUiLayer();
+                GameObject auraObj = new GameObject("VHVR_MagicMoteAura_" + i);
+                auraObj.transform.SetParent(moteObj.transform, false);
+                auraObj.layer = LayerUtils.getWorldspaceUiLayer();
 
-            MeshFilter moteAuraMf = moteAuraObject.AddComponent<MeshFilter>();
-            moteAuraMf.sharedMesh = GetTwoSidedQuadMesh();
+                MeshFilter auraMf = auraObj.AddComponent<MeshFilter>();
+                auraMf.sharedMesh = GetTwoSidedQuadMesh();
 
-            moteAuraRenderer = moteAuraObject.AddComponent<MeshRenderer>();
-            moteAuraMaterial = unlitMatAsset != null ? Instantiate(unlitMatAsset) : new Material(Shader.Find("Unlit/Transparent") ?? Shader.Find("Unlit/Color"));
-            moteAuraMaterial.mainTexture = GetRimGlowTexture();
-            moteAuraRenderer.material = moteAuraMaterial;
-            moteAuraRenderer.receiveShadows = false;
-            moteAuraRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            moteAuraRenderer.lightProbeUsage = LightProbeUsage.Off;
-            moteAuraRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+                var aRenderer = auraObj.AddComponent<MeshRenderer>();
+                var aMat = unlitMatAsset != null ? Instantiate(unlitMatAsset) : new Material(Shader.Find("Unlit/Transparent") ?? Shader.Find("Unlit/Color"));
+                aMat.mainTexture = GetRimGlowTexture();
+                aRenderer.material = aMat;
+                aRenderer.receiveShadows = false;
+                aRenderer.shadowCastingMode = ShadowCastingMode.Off;
+                aRenderer.lightProbeUsage = LightProbeUsage.Off;
+                aRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
 
-            moteObject.SetActive(false);
+                moteObj.SetActive(false);
+
+                motePool.Add(new MoteInstance
+                {
+                    gameObject = moteObj,
+                    meshRenderer = mRenderer,
+                    material = mMat,
+                    auraObject = auraObj,
+                    auraRenderer = aRenderer,
+                    auraMaterial = aMat,
+                    localOffset = Vector3.zero,
+                    isActive = false
+                });
+            }
 
             indicatorObject.SetActive(false);
 
@@ -358,23 +381,26 @@ namespace ValheimVRMod.Scripts
                 rimMaterial = null;
             }
 
-            if (moteMaterial != null)
+            for (int i = 0; i < motePool.Count; i++)
             {
-                Destroy(moteMaterial);
-                moteMaterial = null;
+                var mote = motePool[i];
+                if (mote.material != null)
+                {
+                    Destroy(mote.material);
+                    mote.material = null;
+                }
+                if (mote.auraMaterial != null)
+                {
+                    Destroy(mote.auraMaterial);
+                    mote.auraMaterial = null;
+                }
+                if (mote.gameObject != null)
+                {
+                    Destroy(mote.gameObject);
+                    mote.gameObject = null;
+                }
             }
-
-            if (moteAuraMaterial != null)
-            {
-                Destroy(moteAuraMaterial);
-                moteAuraMaterial = null;
-            }
-
-            if (moteObject != null)
-            {
-                Destroy(moteObject);
-                moteObject = null;
-            }
+            motePool.Clear();
 
             if (particleMaterial != null)
             {
@@ -394,25 +420,67 @@ namespace ValheimVRMod.Scripts
             ResetCharge();
         }
 
-        private void SpawnNextMote(float activeDistance)
+        private void SpawnMoteWave(float activeDistance)
         {
+            HideAllMotes();
+
+            int count = Mathf.Clamp(VHVRConfig.MagicMotesPerStage(), 1, MAX_POOLED_MOTES);
+            activeMotesRemaining = count;
+
             float minR = Mathf.Max(0.10f, VHVRConfig.MagicPrecastDistance() * 0.55f);
             float maxR = Mathf.Max(minR + 0.05f, activeDistance * 0.82f);
-            float r = UnityEngine.Random.Range(minR, maxR);
 
-            Vector3 dir = UnityEngine.Random.onUnitSphere;
-            if (dir.z < -0.3f)
+            for (int i = 0; i < count; i++)
             {
-                dir.z = -dir.z;
+                var mote = motePool[i];
+                Vector3 chosenPos = Vector3.zero;
+
+                for (int attempt = 0; attempt < 12; attempt++)
+                {
+                    float r = UnityEngine.Random.Range(minR, maxR);
+                    Vector3 dir = UnityEngine.Random.onUnitSphere;
+                    if (dir.z < -0.3f)
+                    {
+                        dir.z = -dir.z;
+                    }
+                    dir.Normalize();
+                    Vector3 testPos = dir * r;
+
+                    bool separated = true;
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (Vector3.Distance(testPos, motePool[j].localOffset) < 0.09f)
+                        {
+                            separated = false;
+                            break;
+                        }
+                    }
+
+                    if (separated || attempt == 11)
+                    {
+                        chosenPos = testPos;
+                        break;
+                    }
+                }
+
+                mote.localOffset = chosenPos;
+                mote.gameObject.transform.localPosition = chosenPos;
+                mote.gameObject.SetActive(true);
+                mote.isActive = true;
             }
-            dir.Normalize();
+        }
 
-            activeMoteLocalPos = dir * r;
-            if (moteObject != null)
+        private void HideAllMotes()
+        {
+            activeMotesRemaining = 0;
+            for (int i = 0; i < motePool.Count; i++)
             {
-                moteObject.transform.localPosition = activeMoteLocalPos;
-                moteObject.SetActive(true);
-                isMoteActive = true;
+                var mote = motePool[i];
+                mote.isActive = false;
+                if (mote.gameObject != null && mote.gameObject.activeSelf)
+                {
+                    mote.gameObject.SetActive(false);
+                }
             }
         }
 
@@ -559,14 +627,13 @@ namespace ValheimVRMod.Scripts
                             }
                             else
                             {
-                                SpawnNextMote(activeDistance);
+                                SpawnMoteWave(activeDistance);
                                 UpdateVfx(tipPos, 0.03f, 0.35f, magicColor, 15f);
                             }
                         }
                         else
                         {
-                            if (moteObject != null) moteObject.SetActive(false);
-                            isMoteActive = false;
+                            HideAllMotes();
                             UpdateVfx(tipPos, 0.03f, 0.35f, magicColor, 15f);
                         }
                     }
@@ -592,25 +659,45 @@ namespace ValheimVRMod.Scripts
                                 }
                             }
 
-                            // Mote collision check
-                            if (isMoteActive && moteObject != null && moteObject.activeSelf)
+                            // Mote collision check across active motes in the wave
+                            if (activeMotesRemaining > 0)
                             {
-                                float distMote = Vector3.Distance(handPos, moteObject.transform.position);
-                                if (distMote <= VHVRConfig.MagicMoteCollisionRadius())
+                                float colRadius = VHVRConfig.MagicMoteCollisionRadius();
+                                for (int i = 0; i < motePool.Count; i++)
                                 {
-                                    accumulatedEitr += VHVRConfig.MagicMoteEitrBonus();
-                                    if (secondaryHand.hapticAction != null)
+                                    var mote = motePool[i];
+                                    if (!mote.isActive || !mote.gameObject.activeSelf) continue;
+
+                                    float distMote = Vector3.Distance(handPos, mote.gameObject.transform.position);
+                                    if (distMote <= colRadius)
                                     {
-                                        secondaryHand.hapticAction.Execute(0, 0.045f, 90f, 0.65f, secInputSource);
+                                        mote.isActive = false;
+                                        mote.gameObject.SetActive(false);
+                                        activeMotesRemaining--;
+
+                                        accumulatedEitr += VHVRConfig.MagicMoteEitrBonus();
+
+                                        if (secondaryHand.hapticAction != null)
+                                        {
+                                            secondaryHand.hapticAction.Execute(0, 0.045f, 90f, 0.65f, secInputSource);
+                                        }
+                                        PlayMoteAbsorbSound();
+
+                                        if (chargeParticles != null)
+                                        {
+                                            ParticleSystem.EmitParams ep = new ParticleSystem.EmitParams();
+                                            ep.position = mote.gameObject.transform.position;
+                                            chargeParticles.Emit(ep, 10);
+                                        }
+
+                                        // If all motes in the stage are absorbed, spawn the next wave!
+                                        if (activeMotesRemaining <= 0)
+                                        {
+                                            SpawnMoteWave(activeDistance);
+                                        }
+
+                                        break;
                                     }
-                                    PlayMoteAbsorbSound();
-                                    if (chargeParticles != null)
-                                    {
-                                        ParticleSystem.EmitParams ep = new ParticleSystem.EmitParams();
-                                        ep.position = moteObject.transform.position;
-                                        chargeParticles.Emit(ep, 10);
-                                    }
-                                    SpawnNextMote(activeDistance);
                                 }
                             }
                         }
@@ -635,8 +722,7 @@ namespace ValheimVRMod.Scripts
                             CurrentState = ChargeState.Charged;
                             AccumulationProgress = 1f;
                             chargeExpiryRemaining = VHVRConfig.MagicChargeExpiryDuration();
-                            if (moteObject != null) moteObject.SetActive(false);
-                            isMoteActive = false;
+                            HideAllMotes();
                             OnChargeComplete(tipPos);
                         }
                     }
@@ -745,23 +831,27 @@ namespace ValheimVRMod.Scripts
                         }
                     }
 
-                    if (moteAuraObject != null && moteObject != null && moteObject.activeSelf)
+                    for (int i = 0; i < motePool.Count; i++)
                     {
-                        Vector3 toCamMote = moteAuraObject.transform.position - mainCam.transform.position;
-                        if (toCamMote.sqrMagnitude > 0.0001f)
+                        var mote = motePool[i];
+                        if (mote.isActive && mote.gameObject != null && mote.gameObject.activeSelf)
                         {
-                            moteAuraObject.transform.rotation = Quaternion.LookRotation(toCamMote);
-                        }
-                    }
-                }
+                            if (mote.auraObject != null)
+                            {
+                                Vector3 toCamMote = mote.auraObject.transform.position - mainCam.transform.position;
+                                if (toCamMote.sqrMagnitude > 0.0001f)
+                                {
+                                    mote.auraObject.transform.rotation = Quaternion.LookRotation(toCamMote);
+                                }
+                            }
 
-                if (moteObject != null && moteObject.activeSelf)
-                {
-                    float motePulse = 0.038f + 0.006f * Mathf.Sin(Time.time * 16f);
-                    moteObject.transform.localScale = Vector3.one * motePulse;
-                    if (moteAuraObject != null)
-                    {
-                        moteAuraObject.transform.localScale = Vector3.one * (motePulse * 1.8f);
+                            float motePulse = 0.038f + 0.006f * Mathf.Sin(Time.time * 16f + i * 1.5f);
+                            mote.gameObject.transform.localScale = Vector3.one * motePulse;
+                            if (mote.auraObject != null)
+                            {
+                                mote.auraObject.transform.localScale = Vector3.one * (motePulse * 1.8f);
+                            }
+                        }
                     }
                 }
             }
@@ -800,14 +890,18 @@ namespace ValheimVRMod.Scripts
                 rimMaterial.color = new Color(baseColor.r, baseColor.g, baseColor.b, alpha * 0.85f);
             }
 
-            // 3. Active casting mote
-            if (moteMaterial != null)
+            // 3. Active casting motes
+            for (int i = 0; i < motePool.Count; i++)
             {
-                moteMaterial.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.95f);
-            }
-            if (moteAuraMaterial != null)
-            {
-                moteAuraMaterial.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.85f);
+                var mote = motePool[i];
+                if (mote.material != null)
+                {
+                    mote.material.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.95f);
+                }
+                if (mote.auraMaterial != null)
+                {
+                    mote.auraMaterial.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.85f);
+                }
             }
 
             // 4. Swirling orbital particles: soft, translucent glowing motes
@@ -936,12 +1030,8 @@ namespace ValheimVRMod.Scripts
             graceRemaining = 0f;
             chargeExpiryRemaining = 0f;
             AccumulationProgress = 0f;
-            isMoteActive = false;
 
-            if (moteObject != null && moteObject.activeSelf)
-            {
-                moteObject.SetActive(false);
-            }
+            HideAllMotes();
 
             if (chargeParticles != null && chargeParticles.isPlaying)
             {
