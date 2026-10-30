@@ -13,9 +13,12 @@
     <Deterministic>true</Deterministic>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <CommonDir>C:\Program Files (x86)\Steam\steamapps\common\</CommonDir>
-    <UnityDir>C:\Program Files (x86)\Hub\Editor\2020.3.45f1\</UnityDir>
-    <ValheimManagedDir>$(CommonDir)Valheim\valheim_Data\Managed\</ValheimManagedDir>
+    <CommonDir Condition="'$(CommonDir)' == '' and Exists('C:\games\Steam\steamapps\common\')">C:\games\Steam\steamapps\common\</CommonDir>
+    <CommonDir Condition="'$(CommonDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\</CommonDir>
+    <UnityDir Condition="'$(UnityDir)' == ''">C:\Program Files (x86)\Hub\Editor\2020.3.45f1\</UnityDir>
+    <ValheimManagedDir Condition="'$(ValheimManagedDir)' == ''">$(CommonDir)Valheim\valheim_Data\Managed\</ValheimManagedDir>
+    <UnityManagedDir Condition="Exists('..\Unity\build\ValheimVR_Data\Managed\Unity.XR.Management.dll')">..\Unity\build\ValheimVR_Data\Managed\</UnityManagedDir>
+    <UnityManagedDir Condition="'$(UnityManagedDir)' == ''">$(ValheimManagedDir)</UnityManagedDir>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -64,12 +67,12 @@
     <PackageReference Include="UnityEngine.Modules" Version="2020.3.45" />
     <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all" />
 	<PackageReference Include="Bhaptics.Tac" Version="1.4.16" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.ValueTuple" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="Unity.InputSystem">
@@ -110,35 +113,36 @@
     </Reference>
     <Reference Include="Unity.XR.Management, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\Unity.XR.Management.dll</HintPath>
+      <HintPath>$(UnityManagedDir)Unity.XR.Management.dll</HintPath>
     </Reference>
     <Reference Include="Unity.XR.OpenVR, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\Unity.XR.OpenVR.dll</HintPath>
+      <HintPath>$(UnityManagedDir)Unity.XR.OpenVR.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.SpatialTracking">
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\UnityEngine.SpatialTracking.dll</HintPath>
+      <HintPath>$(UnityManagedDir)UnityEngine.SpatialTracking.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(UnityManagedDir)UnityEngine.UI.dll</HintPath>
     </Reference>
     <Reference Include="final_ik.dll">
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\final_ik.dll</HintPath>
+      <HintPath>$(UnityManagedDir)final_ik.dll</HintPath>
     </Reference>
     <Reference Include="root_motion_demo_assets">
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\root_motion_demo_assets.dll</HintPath>
+      <HintPath>$(UnityManagedDir)root_motion_demo_assets.dll</HintPath>
     </Reference>
     <Reference Include="root_motion_shared">
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\root_motion_shared.dll</HintPath>
+      <HintPath>$(UnityManagedDir)root_motion_shared.dll</HintPath>
     </Reference>
     <Reference Include="SteamVR, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\SteamVR.dll</HintPath>
+      <HintPath>$(UnityManagedDir)SteamVR.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Unity\build\ValheimVR_Data\Managed\Valve.Newtonsoft.Json.dll</HintPath>
+      <HintPath Condition="Exists('$(UnityManagedDir)Valve.Newtonsoft.Json.dll')">$(UnityManagedDir)Valve.Newtonsoft.Json.dll</HintPath>
+      <HintPath Condition="!Exists('$(UnityManagedDir)Valve.Newtonsoft.Json.dll')">$(UnityManagedDir)Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipReleasePackaging)' != 'true'">

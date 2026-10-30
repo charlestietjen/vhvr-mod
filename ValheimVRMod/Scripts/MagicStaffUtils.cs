@@ -90,9 +90,67 @@ namespace ValheimVRMod.Scripts
             return secondaryAttack != null && Player.m_localPlayer.TryUseEitr(secondaryAttack.m_attackEitr);
         }
 
+        public static float GetCurrentAttackEitrCost(Player player)
+        {
+            if (player == null) return 0f;
+            var weapon = player.GetCurrentWeapon();
+            if (weapon == null || weapon.m_shared == null) return 0f;
+
+            ItemDrop.ItemData ammoItem = null;
+            if (!string.IsNullOrEmpty(weapon.m_shared.m_ammoType))
+            {
+                ammoItem = player.GetAmmoItem();
+                if (ammoItem != null && (!player.GetInventory().ContainsItem(ammoItem) || ammoItem.m_shared.m_ammoType != weapon.m_shared.m_ammoType))
+                {
+                    ammoItem = null;
+                }
+                if (ammoItem == null)
+                {
+                    ammoItem = player.GetInventory().GetAmmoItem(weapon.m_shared.m_ammoType);
+                }
+            }
+
+            float baseEitr = 0f;
+            Skills.SkillType skillType = weapon.m_shared.m_skillType;
+
+            if (ammoItem != null && ammoItem.m_shared?.m_attack != null && ammoItem.m_shared.m_attack.m_attackEitr > 0f)
+            {
+                baseEitr = ammoItem.m_shared.m_attack.m_attackEitr;
+                if (ammoItem.m_shared.m_skillType != Skills.SkillType.None)
+                {
+                    skillType = ammoItem.m_shared.m_skillType;
+                }
+            }
+            else if (weapon.m_shared.m_attack != null)
+            {
+                baseEitr = weapon.m_shared.m_attack.m_attackEitr;
+            }
+
+            if (baseEitr <= 0f)
+            {
+                return 0f;
+            }
+
+            float skillFactor = player.GetSkillFactor(skillType);
+            float cost = baseEitr - (baseEitr * 0.33f * skillFactor);
+            return Mathf.Max(0f, cost);
+        }
+
+        public static bool HasEnoughEitrToCast(Player player)
+        {
+            if (player == null) return false;
+            float cost = GetCurrentAttackEitrCost(player);
+            return cost <= 0f || player.GetEitr() >= cost;
+        }
+
         // TODO: Consider moving this to WeaponUtils since its logic is not specific to magic weapons.
         public static Vector3 GetProjectileSpawnPoint(Attack attack, Vector3 offsetDirection, VRLaserPointer weaponHandPointer)
         {
+            if (VHVRConfig.GestureMagicCasting() && LocalWeaponWield.localWeaponTip != Vector3.zero)
+            {
+                return LocalWeaponWield.localWeaponTip + offsetDirection.normalized * 0.15f;
+            }
+
             var offsetAmount =
                 (new Vector3(attack.m_attackOffset, attack.m_attackRange, attack.m_attackHeight)).magnitude;
             if (attack.m_attackAnimation.Contains("summon"))

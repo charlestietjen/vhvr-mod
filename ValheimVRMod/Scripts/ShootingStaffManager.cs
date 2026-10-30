@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using UnityEngine;
+using ValheimVRMod.Utilities;
 
 namespace ValheimVRMod.Scripts
 {
@@ -24,7 +25,19 @@ namespace ValheimVRMod.Scripts
 
         public bool AttemptingAttack
         {
-            get { return MagicStaffUtils.IsShootingTriggerHeld(); }
+            get
+            {
+                if (VHVRConfig.GestureMagicCasting() && MagicGestureChargeController.instance != null)
+                {
+                    if (!MagicStaffUtils.IsShootingTriggerHeld())
+                    {
+                        return false;
+                    }
+                    var attack = Player.m_localPlayer?.GetRightItem()?.m_shared?.m_attack;
+                    return MagicGestureChargeController.instance.OnAttemptAttack(attack);
+                }
+                return MagicStaffUtils.IsShootingTriggerHeld();
+            }
         }
 
         public bool IsSecondaryAttack
@@ -41,7 +54,7 @@ namespace ValheimVRMod.Scripts
         {
             get
             {
-                return isCurrentlyTwoHanded() || isAiming ?
+                return (VHVRConfig.GestureMagicCasting() || isCurrentlyTwoHanded() || isAiming) ?
                     weaponForward :
                     MagicStaffUtils.WeaponHandPointer.rayDirection * Vector3.forward;
             }

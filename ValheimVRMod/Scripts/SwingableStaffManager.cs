@@ -42,6 +42,10 @@ namespace ValheimVRMod.Scripts
         {
             get
             {
+                if (VHVRConfig.GestureMagicCasting())
+                {
+                    return LocalWeaponWield.weaponForward;
+                }
                 if (UseSwingForCurrentAttack())
                 {
                     return aimDir;
@@ -56,6 +60,16 @@ namespace ValheimVRMod.Scripts
         {
             get
             {
+                if (VHVRConfig.GestureMagicCasting() && MagicGestureChargeController.instance != null)
+                {
+                    if (!MagicStaffUtils.IsShootingTriggerHeld())
+                    {
+                        return false;
+                    }
+                    var attack = Player.m_localPlayer?.GetRightItem()?.m_shared?.m_attack;
+                    return MagicGestureChargeController.instance.OnAttemptAttack(attack);
+                }
+
                 if (UseSwingForCurrentAttack())
                 {
                     return isThrowing;
@@ -87,7 +101,7 @@ namespace ValheimVRMod.Scripts
 
         public bool ShouldSkipAttackAnimation()
         {
-            return UseSwingForCurrentAttack();
+            return VHVRConfig.GestureMagicCasting() || UseSwingForCurrentAttack();
         }
 
         public Vector3 GetProjectileSpawnPoint(Attack attack)

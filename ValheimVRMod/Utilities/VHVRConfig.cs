@@ -146,6 +146,18 @@ namespace ValheimVRMod.Utilities
         private static ConfigEntry<float> smoothTurnSpeed;
         private static ConfigEntry<bool> invertXAxis;
         private static ConfigEntry<bool> allowSimpleMagicAttack;
+        private static ConfigEntry<bool> gestureMagicCasting;
+        private static ConfigEntry<bool> activeGestureCasting;
+        private static ConfigEntry<float> magicPrecastDuration;
+        private static ConfigEntry<float> magicPrecastDistance;
+        private static ConfigEntry<float> magicActiveCastDistance;
+        private static ConfigEntry<float> magicGestureGracePeriod;
+        private static ConfigEntry<float> magicPassiveFeedRate;
+        private static ConfigEntry<float> magicPassiveFeedInterval;
+        private static ConfigEntry<float> magicMoteEitrBonus;
+        private static ConfigEntry<float> magicMoteCollisionRadius;
+        private static ConfigEntry<float> magicFizzleLockout;
+        private static ConfigEntry<float> magicChargeExpiryDuration;
         private static ConfigEntry<string> groqApiKey;
 
         // Graphics Settings
@@ -919,6 +931,75 @@ namespace ValheimVRMod.Utilities
                                                     "Allows casting with a staff, orb or summoner held in one hand by just pulling the trigger of that hand. " +
                                                     "When disabled, casting requires either two-handed wield or holding grab with the same hand while pulling the trigger, " +
                                                     "and swingable staves can only swing-launch when held in one hand");
+            gestureMagicCasting = config.Bind("Controls",
+                                                "GestureMagicCasting",
+                                                true,
+                                                "When enabled, casting with a magic staff requires holding the off-hand near the staff tip to accumulate power before the trigger will cast. " +
+                                                "Projectiles align directly with the staff tip.");
+            activeGestureCasting = config.Bind("Controls",
+                                               "ActiveGestureCasting",
+                                               true,
+                                               "When enabled, gesture magic uses an active Eitr feeding minigame with spawnable motes instead of a flat timer.");
+            magicPrecastDuration = config.Bind("Controls",
+                                                "MagicPrecastDuration",
+                                                0.5f,
+                                                new ConfigDescription(
+                                                    "Duration in seconds the off-hand must remain near the staff tip when ActiveGestureCasting is disabled.",
+                                                    new AcceptableValueRange<float>(0.1f, 2.0f)));
+            magicPrecastDistance = config.Bind("Controls",
+                                                "MagicPrecastDistance",
+                                                0.22f,
+                                                new ConfigDescription(
+                                                    "Inner threshold distance in meters to initiate charging near the staff tip.",
+                                                    new AcceptableValueRange<float>(0.10f, 0.45f)));
+            magicActiveCastDistance = config.Bind("Controls",
+                                                  "MagicActiveCastDistance",
+                                                  0.45f,
+                                                  new ConfigDescription(
+                                                      "Outer threshold distance in meters to maintain charging and catch motes around the staff tip.",
+                                                      new AcceptableValueRange<float>(0.20f, 0.80f)));
+            magicGestureGracePeriod = config.Bind("Controls",
+                                                  "MagicGestureGracePeriod",
+                                                  0.50f,
+                                                  new ConfigDescription(
+                                                      "Grace period in seconds allowed out of the active casting zone before charging is cancelled.",
+                                                      new AcceptableValueRange<float>(0.10f, 2.0f)));
+            magicPassiveFeedRate = config.Bind("Controls",
+                                               "MagicPassiveFeedRate",
+                                               2.0f,
+                                               new ConfigDescription(
+                                                   "Eitr fed passively into the staff per tick.",
+                                                   new AcceptableValueRange<float>(0.5f, 20.0f)));
+            magicPassiveFeedInterval = config.Bind("Controls",
+                                                   "MagicPassiveFeedInterval",
+                                                   0.25f,
+                                                   new ConfigDescription(
+                                                       "Interval in seconds between passive Eitr feed ticks.",
+                                                       new AcceptableValueRange<float>(0.05f, 1.0f)));
+            magicMoteEitrBonus = config.Bind("Controls",
+                                             "MagicMoteEitrBonus",
+                                             5.0f,
+                                             new ConfigDescription(
+                                                 "Immediate Eitr fed into the staff upon catching a mote with the off-hand.",
+                                                 new AcceptableValueRange<float>(1.0f, 25.0f)));
+            magicMoteCollisionRadius = config.Bind("Controls",
+                                                   "MagicMoteCollisionRadius",
+                                                   0.075f,
+                                                   new ConfigDescription(
+                                                       "Contact radius in meters for the off-hand to catch an active mote.",
+                                                       new AcceptableValueRange<float>(0.03f, 0.20f)));
+            magicFizzleLockout = config.Bind("Controls",
+                                             "MagicFizzleLockout",
+                                             1.0f,
+                                             new ConfigDescription(
+                                                 "Lockout duration in seconds after an insufficient Eitr fizzle before charging can be re-attempted.",
+                                                 new AcceptableValueRange<float>(0.2f, 3.0f)));
+            magicChargeExpiryDuration = config.Bind("Controls",
+                                                    "MagicChargeExpiryDuration",
+                                                    14.0f,
+                                                    new ConfigDescription(
+                                                        "Duration in seconds a staff remains charged before the gathered magic power dissipates.",
+                                                        new AcceptableValueRange<float>(2.0f, 60.0f)));
             groqApiKey = config.Bind(
                 "Controls",
                 "GroqApiKey",
@@ -1994,6 +2075,66 @@ namespace ValheimVRMod.Utilities
         public static bool AllowSimpleMagicAttack()
         {
             return allowSimpleMagicAttack.Value;
+        }
+
+        public static bool GestureMagicCasting()
+        {
+            return gestureMagicCasting.Value;
+        }
+
+        public static float MagicPrecastDuration()
+        {
+            return magicPrecastDuration.Value;
+        }
+
+        public static float MagicPrecastDistance()
+        {
+            return magicPrecastDistance.Value;
+        }
+
+        public static float MagicChargeExpiryDuration()
+        {
+            return magicChargeExpiryDuration.Value;
+        }
+
+        public static bool ActiveGestureCasting()
+        {
+            return activeGestureCasting.Value;
+        }
+
+        public static float MagicActiveCastDistance()
+        {
+            return magicActiveCastDistance.Value;
+        }
+
+        public static float MagicGestureGracePeriod()
+        {
+            return magicGestureGracePeriod.Value;
+        }
+
+        public static float MagicPassiveFeedRate()
+        {
+            return magicPassiveFeedRate.Value;
+        }
+
+        public static float MagicPassiveFeedInterval()
+        {
+            return magicPassiveFeedInterval.Value;
+        }
+
+        public static float MagicMoteEitrBonus()
+        {
+            return magicMoteEitrBonus.Value;
+        }
+
+        public static float MagicMoteCollisionRadius()
+        {
+            return magicMoteCollisionRadius.Value;
+        }
+
+        public static float MagicFizzleLockout()
+        {
+            return magicFizzleLockout.Value;
         }
 
         public static string GroqApiKey()

@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -364,6 +364,14 @@ namespace ValheimVRMod.Patches
             if (isSwingableStaff)
             {
                 meshFilter.gameObject.AddComponent<SwingableStaffManager>();
+            }
+
+            if (EquipScript.CurrentMainHandEquipType() == EquipType.Magic && !isSummoner && !OrbManager.ITEM_NAMES.Contains(rightItemName))
+            {
+                if (___m_rightItemInstance.GetComponent<MagicGestureChargeController>() == null)
+                {
+                    ___m_rightItemInstance.AddComponent<MagicGestureChargeController>();
+                }
             }
 
             if (EquipScript.IsThrowable(player.GetRightItem()) || EquipScript.IsSpearEquipped() || EquipScript.CurrentMainHandEquipType() == EquipType.ThrowObject)

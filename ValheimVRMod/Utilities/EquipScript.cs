@@ -381,6 +381,10 @@ namespace ValheimVRMod.Utilities
             }
             if (CurrentOffHandEquipType() == EquipType.Magic || CurrentMainHandEquipType() == EquipType.Magic)
             {
+                if (VHVRConfig.GestureMagicCasting())
+                {
+                    return true;
+                }
                 return SwingableStaffManager.instance != null && SwingableStaffManager.instance.UseSwingForCurrentAttack();
             }
             return CurrentOffHandEquipType() != EquipType.Crossbow;
