@@ -157,6 +157,7 @@ namespace ValheimVRMod.Utilities
         private static ConfigEntry<float> magicMoteEitrBonus;
         private static ConfigEntry<float> magicMoteCollisionRadius;
         private static ConfigEntry<int> magicMotesPerStage;
+        private static ConfigEntry<float> magicChargingEitrRegenMultiplier;
         private static ConfigEntry<float> magicFizzleLockout;
         private static ConfigEntry<float> magicChargeExpiryDuration;
         private static ConfigEntry<string> groqApiKey;
@@ -995,6 +996,12 @@ namespace ValheimVRMod.Utilities
                                              new ConfigDescription(
                                                  "Number of elemental motes spawned simultaneously per wave during active gesture casting. Once all active motes are absorbed, the next wave spawns.",
                                                  new AcceptableValueRange<int>(1, 10)));
+            magicChargingEitrRegenMultiplier = config.Bind("Controls",
+                                                           "MagicChargingEitrRegenMultiplier",
+                                                           0.0f,
+                                                           new ConfigDescription(
+                                                               "Multiplier applied to player Eitr regeneration while gesture charging or holding a charged magic spell (0.0 = no Eitr regen while charging).",
+                                                               new AcceptableValueRange<float>(0.0f, 1.0f)));
             magicFizzleLockout = config.Bind("Controls",
                                              "MagicFizzleLockout",
                                              1.0f,
@@ -2142,6 +2149,11 @@ namespace ValheimVRMod.Utilities
         public static int MagicMotesPerStage()
         {
             return magicMotesPerStage.Value;
+        }
+
+        public static float MagicChargingEitrRegenMultiplier()
+        {
+            return magicChargingEitrRegenMultiplier.Value;
         }
 
         public static float MagicFizzleLockout()

@@ -1436,4 +1436,40 @@ namespace ValheimVRMod.Patches {
             mouseLook.x *= VHVRConfig.SmoothTurnSpeed();
         }
     }
+
+    [HarmonyPatch(typeof(Player), nameof(Player.UpdateStats), new Type[] { typeof(float) })]
+    class Player_UpdateStats_EitrRegenPatch
+    {
+        private static float s_prevEitr = 0f;
+        private static bool s_isLocalCharging = false;
+
+        static void Prefix(Player __instance)
+        {
+            if (__instance == Player.m_localPlayer &&
+                MagicGestureChargeController.instance != null &&
+                MagicGestureChargeController.instance.IsCharging)
+            {
+                s_isLocalCharging = true;
+                s_prevEitr = __instance.m_eitr;
+            }
+            else
+            {
+                s_isLocalCharging = false;
+            }
+        }
+
+        static void Postfix(Player __instance)
+        {
+            if (s_isLocalCharging && __instance == Player.m_localPlayer)
+            {
+                if (__instance.m_eitr > s_prevEitr)
+                {
+                    float gained = __instance.m_eitr - s_prevEitr;
+                    float multiplier = VHVRConfig.MagicChargingEitrRegenMultiplier();
+                    __instance.m_eitr = s_prevEitr + gained * multiplier;
+                    __instance.m_nview?.GetZDO()?.Set(ZDOVars.s_eitr, __instance.m_eitr);
+                }
+            }
+        }
+    }
 }

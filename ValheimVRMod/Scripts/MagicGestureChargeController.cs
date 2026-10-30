@@ -28,8 +28,10 @@ namespace ValheimVRMod.Scripts
 
         public ChargeState CurrentState { get; private set; } = ChargeState.Idle;
         public float AccumulationProgress { get; private set; } = 0f;
+        public bool IsAccumulating => CurrentState == ChargeState.Accumulating;
         public bool IsCharged => CurrentState == ChargeState.Charged;
         public bool IsChanneling => CurrentState == ChargeState.Channeling;
+        public bool IsCharging => CurrentState == ChargeState.Accumulating || CurrentState == ChargeState.Charged;
 
         private float accumulatedTimer = 0f;
         private float accumulatedEitr = 0f;
